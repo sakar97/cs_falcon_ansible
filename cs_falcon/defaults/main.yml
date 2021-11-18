@@ -1,0 +1,12 @@
+---
+# defaults file for falcon_installation
+
+falcon_cid: "002979E372ED42A1B516DB25C3460EE8-6F"
+falcon_cloud: "api.crowdstrike.com"
+falcon_client_id: "a771dikxKI8Dk9lkdkdkdh0KiJu7JGsjdkGMLTW3"
+falcon_client_secret: "a771dikxKI8Dk9lkdkdkdh0KiJu7JGsjdkGMLTW3"
+falcon_install_tmp_dir: "/tmp/"
+falcon_target_os:
+falcon_os_version:
+os_version:
+falcon_sensor_version: 0

@@ -1,0 +1,61 @@
+---
+- name: Authenticate to CrowdStrike API
+  ansible.builtin.uri:
+    url: "https://{{ falcon_cloud }}/oauth2/token"
+    method: POST
+    body_format: json
+    body:
+      "client_id={{ falcon_client_id }}&client_secret={{ falcon_client_secret }}"
+    return_content: true
+    status_code: 201
+    headers:
+      content-type: application/x-www-form-urlencoded
+  register: falcon_api_oauth2_token
+
+- name: Detect the Target CID Based on Credentials
+  ansible.builtin.uri:
+    url: https://{{ falcon_cloud }}/sensors/queries/installers/ccid/v1
+    method: GET
+    return_content: true
+    headers:
+      authorization: "Bearer {{ falcon_api_oauth2_token.json.access_token }}"
+      Content-Type: application/json
+  register: falcon_api_target_cid
+
+# Block when falcon_sensor_update_policy_name is supplied
+
+- name: "CrowdStrike Falcon | Build API Query"
+  ansible.builtin.set_fact:
+    falcon_os_query: "{{ 'os:\"' + falcon_target_os + '\"+os_version:\"' + falcon_os_version + '\"' }}"
+
+- name: CrowdStrike Falcon | Get list of filtered Falcon sensors
+  ansible.builtin.uri:
+    url: "https://{{ falcon_cloud }}/sensors/combined/installers/v1?filter={{ falcon_os_query | urlencode }}"
+    method: GET
+    return_content: true
+    headers:
+      authorization: "Bearer {{ falcon_api_oauth2_token.json.access_token }}"
+      Content-Type: application/json
+  register: falcon_api_installer_list
+
+- name: Debug latest version of Falcon fetch from above task
+  debug:
+    msg: "{{ falcon_api_installer_list.json.version }}"
+
+- name: CrowdStrike Falcon | Download Falcon Sensor Installation Package
+  ansible.builtin.get_url:
+    url: "https://{{ falcon_cloud }}/sensors/entities/download-installer/v1?id={{ falcon_api_installer_list.json.resources[falcon_sensor_version | int].sha256 }}"
+    dest: "/var/tmp/{{filename_cs}}"
+    checksum: "sha256:{{ falcon_api_installer_list.json.resources[falcon_sensor_version | int].sha256 }}"
+    headers:
+      authorization: "Bearer {{ falcon_api_oauth2_token.json.access_token }}"
+  register: falcon_sensor_download
+
+- name: CrowdStrike Falcon | Set CID received from API
+  ansible.builtin.set_fact:
+    falcon_cid: "{{ falcon_api_target_cid.json.resources[0] }}"
+  when: not falcon_cid
+
+- name: CrowdStrike Falcon | Set full file download path
+  ansible.builtin.set_fact:
+    falcon_sensor_pkg: "{{ falcon_sensor_download.dest }}"

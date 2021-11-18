@@ -1,0 +1,55 @@
+---
+- block:
+  - name: Set default sensor name
+    ansible.builtin.set_fact:
+      installed_sensor: falcon-sensor
+    when:
+      - ansible_pkg_mgr in linux_packagers
+
+  - name: Set default sensor name
+    ansible.builtin.set_fact:
+      falcon_sensor_pkg: "{{ installed_sensor }}"
+    when:
+      - ansible_pkg_mgr in linux_packagers
+      - falcon_sensor_download is not defined
+
+  - name: Install Falcon Sensor Package
+    ansible.builtin.package:
+      deb: "{{ falcon_sensor_pkg if (ansible_pkg_mgr in dpkg_packagers) else omit }}"
+      name: "{{ falcon_sensor_pkg if (ansible_pkg_mgr in rpm_packagers) else omit }}"
+      state: present
+    when:
+      - ansible_pkg_mgr in linux_packagers
+
+  - name: Verify Falcon Package Is Installed
+    ansible.builtin.package_facts:
+      manager: auto
+    when: ansible_distribution != "MacOSX"
+
+  - name: Check if Customer ID (CID) is associated with Falcon Sensor
+    ansible.builtin.command: "/opt/CrowdStrike/falconctl -g --cid"
+    register: cid_associated
+    failed_when:
+      - cid_associated.rc != 0
+      - cid_associated.rc != 255
+    changed_when: '"cid=" not in cid_associated.stdout'
+
+  - name: Associate Falcon Sensor with your Customer ID (CID)
+    ansible.builtin.command: "/opt/CrowdStrike/falconctl -s -f --cid={{ falcon_cid }}"
+    when:
+      - '"cid=" not in cid_associated.stdout'
+      - not falcon_provisioning_token
+      - falcon_cid is defined
+      - ansible_facts.packages is defined
+      - installed_sensor in ansible_facts.packages
+      - ansible_distribution != "MacOSX"
+
+  - name: CrowdStrike Falcon Installer | Starting Falcon Sensor Daemon
+    ansible.builtin.service:
+      name: falcon-sensor
+      state: "{{ falcon_service_state | default('started') }}"
+      enabled: yes
+    when:
+      - falcon_cid is defined
+      - ansible_facts.packages is defined
+      - installed_sensor in ansible_facts.packages

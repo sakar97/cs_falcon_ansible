@@ -1,0 +1,5 @@
+---
+# tasks file for cs_falcon
+ - include_tasks: api.yml
+ - include_tasks: preinstall.yml
+ - include_tasks: install.yml

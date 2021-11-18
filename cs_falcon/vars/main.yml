@@ -1,0 +1,11 @@
+---
+# vars file for cs_falcon
+
+linux_packagers: "{{ rpm_packagers }}"
+
+rpm_packagers:
+  - yum
+  - rpm
+  - dnf
+  - zypper
+
